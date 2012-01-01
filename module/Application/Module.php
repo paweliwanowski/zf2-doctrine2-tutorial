@@ -15,6 +15,8 @@ class Module implements AutoloaderProvider
     {
         $events = StaticEventManager::getInstance();
         $events->attach('bootstrap', 'bootstrap', array($this, 'initializeView'), 100);
+        // Init Doctrine
+        $events->attach('bootstrap', 'bootstrap', array($this, 'initializeDoctrine'));
     }
 
     public function getAutoloaderConfig()
@@ -46,6 +48,26 @@ class Module implements AutoloaderProvider
         $app->events()->attachAggregate($viewListener);
         $events       = StaticEventManager::getInstance();
         $viewListener->registerStaticListeners($events, $locator);
+    }
+    
+    public function initializeDoctrine ($e) {
+        // YAML metadata
+        $metaConfig = \Doctrine\ORM\Tools\Setup::createYAMLMetadataConfiguration(array('models/Yaml'), true, 'models/Proxies');
+        // Proxies
+        $metaConfig->setProxyNamespace('Proxies');
+        // Cache
+        $metaConfig->setMetadataCacheImpl(new \Doctrine\Common\Cache\ArrayCache);
+        // Class loaders
+        $classLoader = new \Doctrine\Common\ClassLoader('Entities', 'models');
+        $classLoader->register();
+        $classLoader = new \Doctrine\Common\ClassLoader('Proxies', 'models');
+        $classLoader->register();
+        // Get application config
+        $config = $e->getParam('config');
+        // Create and register Entity Manager
+        $em = \Doctrine\ORM\EntityManager::create($config['doctrine']['connection']->toArray(), $metaConfig);
+        // Register Entity Manager
+        \Zend\Registry::set('em', $em);
     }
 
     protected function getViewListener($view, $config)
